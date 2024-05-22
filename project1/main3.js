@@ -5,7 +5,26 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { RGBELoader } from 'three/addons/loaders/RGBELoader.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
-const container = document.getElementById("container");
+var headings  = document.querySelector("#headings");
+headings.style.display = "none";
+var holder = document.querySelector("#holder");
+holder.style.display = "none";
+const container = document.querySelector("#container");
+container.style.display = "none";
+let loader = $("#loader");
+loader.css({"display" : "flex", 
+"text-align" : "center", 
+"width" : `${window.innerWidth}px`, 
+"height" : "100vh",
+"align-items" : "center",
+"justify-content": "center",
+"background-color": "red",
+"border-width" : "0",
+border: "none",
+"flex-direction" : "column"
+});
+
+
 const scene = new THREE.Scene();
 
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
@@ -45,18 +64,19 @@ directionLight.castShadow = true;
 const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
 scene.add(ambientLight);
 
+let environ_promise = new Promise((resolve, reject) =>{
 //ADDING environment/surroundigs
 const environment = new RGBELoader();
 environment.load(
 "christmas_photo_studio_05_2k.hdr",
 (environmentMap) => {
-environmentMap.mapping = THREE.EquirectangularReflectionMapping;
-scene.background = environmentMap;
-scene.environment = environmentMap;
+resolve(environmentMap)
 },
-(environload) => console.log((environload.loaded/environload.total) * 100 + "% loaded")
+(environload) => console.log((environload.loaded/environload.total) * 100 + "% loaded"),
+(error) => reject(error)
 
 );
+})
 
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.target.set(0, 0, 0);
@@ -75,21 +95,42 @@ function (object) {scene.add(object)},
 );
 };
 
-const gltfLoader = () => {
+//using promise to wait for the model to be loaded
+let gltfpromise = new Promise((resolve, reject) =>{
 let gltfloader = new GLTFLoader();
 gltfloader.load(
 "/nike_air_zoom_pegasus_36/scene.gltf",
 (gltf) => {
 const model = gltf.scene;
-scene.add(model);
+resolve(model);
 },
 (xhr) => console.log((xhr.loaded / xhr.total) * 100 + "% loaded"),
-(error) => console.log("An error occurred when trying to load the model" + error)
+(error) => {
+console.log("An error occurred when trying to load the model" + error)
+reject(error);
+}
 );
+});
 
-};
-
-gltfLoader();
+Promise.all([environ_promise, gltfpromise])
+.then(
+([environmentMap, model]) =>{
+environmentMap.mapping = THREE.EquirectangularReflectionMapping;
+scene.background = environmentMap;
+scene.environment = environmentMap;
+scene.add(model);
+loader.css("display", "none");
+holder.style.display = "block";
+headings.style.display = "block";
+container.style.display = "block";
+}
+)
+.catch(
+(error1, error2) =>{
+if (error1) console.log(error1)
+if (error2) console.log(error2)
+}
+)
 
 
 const animate = () => {
